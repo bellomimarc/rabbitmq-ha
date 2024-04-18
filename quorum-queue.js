@@ -27,24 +27,35 @@ const ch1 = await conn.createConfirmChannel();
 await ch1.assertQueue(queue, { durable: true, arguments: {"x-queue-type" : "quorum"} });
 console.info('Queue created:', queue);
 
+async function sendToQueueAsync(ch, queue, message, options) {
+    return new Promise((resolve, reject) => {
+        const b = ch.sendToQueue(queue, message, options, (err, ok) => {
+            if (err) {
+                reject(err);
+            } else {
+                resolve(ok);
+            }
+        });
+
+        if (!b) {
+            reject(new Error('Message not sent'));
+        }
+
+    });
+};
+
 switch (mode) {
     case 'send':
         for (let i = 0; i < count; i++) {
-            const b = ch1.sendToQueue(
+            await sendToQueueAsync(
+                ch1, 
                 queue, 
                 Buffer.from('something to do: ' + i), 
-                { deliveryMode },
-                function(err, ok) {
-                    console.log('Message sent:', i, err, ok)
-                }
+                { deliveryMode }
             );
-            if (!b) {
-                console.error('Message not sent:', i);
-                break;
-            }
         }
         console.info('Sent', count, 'messages to', queue);
-        break;
+        process.exit(0);
     case 'receive':
         ch1.prefetch(count);
         ch1.consume(queue, (msg) => {
